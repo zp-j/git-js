@@ -8,11 +8,10 @@
     * @param {String} baseDir
     * @constructor
     */
-   function Git(baseDir, env, privateKeyPath) {
+   function Git(baseDir, env) {
       this._baseDir = baseDir;
       this._runCache = [];
       this._env = env;
-      this._privateKeyPath = privateKeyPath;
    }
 
    /**
@@ -20,19 +19,10 @@
     *
     * @param {Function} [then]
     */
-   Git.prototype.init = function(options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.init = function(then) {
       return this._run('git init', function(err) {
          then && then(err);
       });
-   };
-
-   Git.prototype._wrapCommand = function(command) {
-   		if (this._privateKeyPath) {
-   			return 'ssh-agent bash -c \'ssh-add ' + this._privateKeyPath + '; ' + command + '\'';
-   		} else {
-   			return command;
-   		}
    };
 
    /**
@@ -42,10 +32,10 @@
     * @param {String} localPath
     * @param {Function} [then]
     */
-   Git.prototype.clone = function(repoPath, localPath, options, then) {
-   		if (then === undefined) { then = options; options = undefined; }
-   		//ssh-agent bash -c 'ssh-add /path/to/private_key; git pull'
-      return this._run(this._wrapCommand('git clone ' + repoPath + ' ' + localPath), options, function(err) {
+   Git.prototype.clone = function(repoPath, localPath, options, then ) {
+      if (then === undefined) { then = options; options = undefined; }
+      this._env = options;
+      return this._run('git clone ' + repoPath + ' ' + localPath, function(err) {
          then && then(err);
       });
    };
@@ -55,8 +45,7 @@
     *
     * @param {Function} [then]
     */
-   Git.prototype.checkoutLatestTag = function(options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.checkoutLatestTag = function(then) {
       var git = this;
       return this.pull().tags(function(err, tags) {
          git.checkout(tags.latest, then);
@@ -69,8 +58,7 @@
     * @param {String|String[]} files
     * @param {Function} [then]
     */
-   Git.prototype.add = function(files, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.add = function(files, then) {
       return this._run('git add "' + [].concat(files).join('" "') + '"', function(err, data) {
          then && then(err);
       });
@@ -84,8 +72,7 @@
     * @param {String|String[]} [files]
     * @param {Function} [then]
     */
-   Git.prototype.commit = function(message, files, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.commit = function(message, files, then) {
       var git = this;
       if(!then && typeof files === "function") {
          then = files;
@@ -105,8 +92,7 @@
     * @param {String} [branch]
     * @param {Function} [then]
     */
-   Git.prototype.pull = function(remote, branch, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.pull = function(remote, branch, then) {
       var command = "git pull";
       if (typeof remote === 'string' && typeof branch === 'string') {
          command += ' "' + remote + '" "' + branch + '"';
@@ -131,8 +117,7 @@
     * @param {String} [branch]
     * @param {Function} [then]
     */
-   Git.prototype.fetch = function(remote, branch, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.fetch = function(remote, branch, then) {
       var command = "git fetch";
       if (typeof remote === 'string' && typeof branch === 'string') {
          command += ' "' + remote + '" "' + branch + '"';
@@ -151,8 +136,7 @@
     *
     * @param {Function} [then]
     */
-   Git.prototype.tags = function(options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.tags = function(then) {
       return this._run('git tag -l', function(err, data) {
          then && then(err, !err && this._parseListTags(data));
       });
@@ -164,8 +148,7 @@
     * @param {String} what
     * @param {Function} [then]
     */
-   Git.prototype.checkout = function(what, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.checkout = function(what, then) {
       return this._run('git checkout "' + what + '"', function(err, data) {
          then && then(err, !err && this._parseCheckout(data));
       });
@@ -178,8 +161,7 @@
     * @param {String} path
     * @param {Function} [then]
     */
-   Git.prototype.submoduleAdd = function(repo, path, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.submoduleAdd = function(repo, path, then) {
       return this._run('git submodule add "' + repo + '" "' + path + '"', function(err) {
          then && then(err);
       });
@@ -191,8 +173,7 @@
     * @param {String} [args]
     * @param {Function} [then]
     */
-   Git.prototype.listRemote = function(args, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.listRemote = function(args, then) {
       if (!then && typeof args === "function") {
          then = args;
          args = '';
@@ -210,8 +191,7 @@
     * @param {Function} [then]
     * @returns {*}
     */
-   Git.prototype.addRemote = function(remoteName, remoteRepo, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.addRemote = function(remoteName, remoteRepo, then) {
       return this._run('git remote add "' + remoteName + '" "' + remoteRepo + '"', function (err) {
          then && then(err);
       });
@@ -224,8 +204,7 @@
     * @param {Function} [then]
     * @returns {*}
     */
-   Git.prototype.removeRemote = function(remoteName, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.removeRemote = function(remoteName, then) {
       return this._run('git remote remove "' + remoteName + '"', function (err) {
          then && then(err);
       });
@@ -239,8 +218,7 @@
     * @param {String} [branch]
     * @param {Function} [then]
     */
-   Git.prototype.push = function(remote, branch, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.push = function(remote, branch, then) {
       var command = "git push";
       if (typeof remote === 'string' && typeof branch === 'string') {
          command += ' "' + remote + '" "' + branch + '"';
@@ -260,8 +238,7 @@
     * @param {String|String[]} files
     * @param {Function} [then]
     */
-   Git.prototype.rm = function(files, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.rm = function(files, then) {
       return this._rm(files, '-f', then);
    };
 
@@ -272,8 +249,7 @@
     * @param {String|String[]} files
     * @param {Function} [then]
     */
-   Git.prototype.rmKeepLocal = function(files, options, then) {
-      if (then === undefined) { then = options; options = undefined; }
+   Git.prototype.rmKeepLocal = function(files, then) {
       return this._rm(files, '--cached', then);
    };
 
@@ -391,9 +367,9 @@
       return data;
    };
 
-   Git.prototype._run = function(command, options, then) {
-   		if (then === undefined) { then = options; options = undefined; }
-      this._runCache.push([command, options, then]);
+   Git.prototype._run = function(command, then) {
+      console.log(command);
+      this._runCache.push([command, then]);
       this._schedule();
       return this;
    };
@@ -401,18 +377,13 @@
    Git.prototype._schedule = function() {
       if(!this._childProcess && this._runCache.length) {
          var task = this._runCache.shift();
-         console.log(task);
          var command = task[0];
-         var options = task[1];
-         var then = task[2];
-         var env = this._env;
+         var then = task[1];
 
          this._childProcess = ChildProcess.exec(
              command,
-             {
-             	cwd: this._baseDir,
-              env: this._env
-            },
+             {cwd: this._baseDir,
+              env: this._env},
              function(err, stdout, stderr) {
                 delete this._childProcess;
 
@@ -430,8 +401,8 @@
       }
    };
 
-   module.exports = function(baseDir, env, privateKeyPath) {
-      return new Git(baseDir || process.cwd(), env, privateKeyPath);
+   module.exports = function(baseDir, env) {
+      return new Git(baseDir || process.cwd(), env);
    };
 
 }());
