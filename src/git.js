@@ -28,11 +28,11 @@
    };
 
    Git.prototype._wrapCommand = function(command) {
-   		if (this._privateKeyPath) {
-   			return 'ssh-agent bash -c \'ssh-add ' + this._privateKeyPath + '; ' + command + '\'';
-   		} else {
-   			return command;
-   		}
+      if (this._privateKeyPath) {
+        return 'ssh-agent bash -c \'ssh-add ' + this._privateKeyPath + '; ' + command + '\'';
+      } else {
+        return command;
+      }
    };
 
    /**
@@ -43,9 +43,9 @@
     * @param {Function} [then]
     */
    Git.prototype.clone = function(repoPath, localPath, options, then) {
-   		if (then === undefined) { then = options; options = undefined; }
-   		//ssh-agent bash -c 'ssh-add /path/to/private_key; git pull'
-      return this._run(this._wrapCommand('git clone ' + repoPath + ' ' + localPath), options, function(err) {
+      if (then === undefined) { then = options; options = undefined; }
+      //ssh-agent bash -c 'ssh-add /path/to/private_key; git pull'
+      return this._run(this._wrapCommand('git clone ' + repoPath + ' ' + localPath), function(err) {
          then && then(err);
       });
    };
@@ -115,7 +115,7 @@
          then = arguments[arguments.length - 1];
       }
 
-      return this._run(command, function(err, data) {
+      return this._run(this._wrapCommand(command), function(err, data) {
          then && then(err, !err && this._parsePull(data));
       });
    };
@@ -141,7 +141,7 @@
          then = arguments[arguments.length - 1];
       }
 
-      return this._run(command, function(err, data) {
+      return this._run(this._wrapCommand(command), function(err, data) {
          then && then(err, !err && this._parsePush(data));
       });
    };
@@ -391,9 +391,8 @@
       return data;
    };
 
-   Git.prototype._run = function(command, options, then) {
-   		if (then === undefined) { then = options; options = undefined; }
-      this._runCache.push([command, options, then]);
+   Git.prototype._run = function(command, then) {
+      this._runCache.push([command, then]);
       this._schedule();
       return this;
    };
@@ -401,16 +400,16 @@
    Git.prototype._schedule = function() {
       if(!this._childProcess && this._runCache.length) {
          var task = this._runCache.shift();
-         console.log(task);
          var command = task[0];
-         var options = task[1];
-         var then = task[2];
+         var then = task[1];
          var env = this._env;
+
+         console.log(command);
 
          this._childProcess = ChildProcess.exec(
              command,
              {
-             	cwd: this._baseDir,
+              cwd: this._baseDir,
               env: this._env
             },
              function(err, stdout, stderr) {
